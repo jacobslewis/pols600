@@ -1,0 +1,607 @@
+---
+title: "Lesson 1 - The Basics"
+author: "Jacob S. Lewis"
+date: '2022-07-22'
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# R Basics
+
+R is a computer language designed for maths and statistics.
+
+It has some big advantages:
+1. It's super powerful.
+2. It's open source and easily extensible
+3. It allows you to work with all sorts of data at once
+4. It's free
+
+I'm not going to go through the whole rigamarole of introducing you to every basic R function, but we will go through some important ones.
+
+First, R can do basic math.
+```{r R Basic Math}
+
+# We can see whether we live in Oceania or not.
+2+2
+
+# Phew! We're still living in the free world ... for now.
+```
+
+Second, R is based on the idea of **objects**. It's not like Stata or Excel, which essentially are user interfaces that wrap themselves around a file. Instead, imagine your R workspace like a desk. You can pile lots of books, papers, maps, drawings, and even 3D prints on it and then interact with all of them!
+
+If we think about objects, we can begin looking at some core R functions.
+```{r R Objects}
+
+# Let's start by creating an object called "object" and telling R that it simply contains the letter "a". Let's start by using the "<-" function.
+
+object <- "a"
+
+# Now, let's confirm that the object really is just the letter "a".
+object
+
+# Now we can create another object using the "=" function. It does the same thing!
+object2 = "b"
+
+# Add them together?
+object + object2
+
+# Nope! Doesn't work
+
+# So, how to we bring them together? Two easy ways:
+# concatenate them with c()
+new.object <- c(object, object2)
+
+# Paste them together with paste()
+new.object2 <- paste(object, object2, sep = ".")
+
+# Let's use numbers
+object3 = 48
+object4 = 26
+
+# We can engage in simple arithmetic with numeric objects
+object3 + object4
+object5 = object3 + object4
+object6 = object3 / object4
+
+# Let's do something crazy, mixing numbers and characters!
+crazy <- paste(object, object3*object4, object2, sep = ":")
+crazy
+```
+
+**Note:** Whenever we create objects or load packages, we are loading them into our `environment`. 
+
+Of course, we will often have to work with large, complex objects with lots of values in them. R does this really well. It's up to us to figure out some basic commands to understand how to navigate these objects.
+
+```{r R Complex objects}
+
+# A simple set of objects might include a string of numbers or characters
+
+# Let's start with numbers. We'll manually create a list (vector) by concatenating several numbers:
+numbs1 <- c(1, 2, 3, 4, 5, 6, 7, 8, 9)
+
+# We can also automatically fill out a list of 1 to 9 using the ":" function:
+numbs2 <- 1:9
+
+# We can begin to select individual items from within the list by focusing on the position of that item. Generally, brackets "[]" are used to "open up" an object and specify something about it. If we wanted to specify that we want the third item in the list of `numbs1`, we would use:
+numbs1[3]
+numbs1[3:6]
+
+# We can even do complex operations using this notation!
+numbs1[4] + numbs1[8]
+
+
+# We can generate some random numbers. As with many things in R, this can be done in many ways.
+
+# Let's start by using the RANDOM UNIFORM NUMBERS function (runif()). Let's start by simply examining what this function does:
+?runif
+
+# Let's create 100 random numbers between 1 and 100. We can then run a quick histogram using R's built-in package to check whether they are uniformly distributed.
+numbs3 <- runif(100, min = 1, max = 100)
+# WHAT SHOULD THIS LOOK LIKE?
+hist(numbs3)
+
+# Now we can create random numbers from a NORMAL DISTRIBUTION using rnorm(). After that, we'll once again histogram it.
+
+# Again, let's look at the function
+?rnorm
+
+numbs4 <- rnorm(100, mean = 50, sd = 10)
+# WHAT SHOULD THIS LOOK LIKE?
+hist(numbs4)
+numbs4[36:40]
+hist(numbs4[4:26])
+
+
+
+# The more numbers we put into each of these, the more they will resemble either uniform or normal distributions.
+numbs5 <- runif(10000, min =  1, max = 100)
+hist(numbs5)
+
+
+numbs6 <- rnorm(10000, mean = 50, sd = 10)
+hist(numbs6)
+
+```
+
+Our data are not always numerical, however! Sometimes, we have data comprised of lists of words.
+```{r R Strings}
+# Let's create an easy concatenate of strings
+str1 <- c("Washington", "State", "University", "Go", "Cougs!")
+
+# The fourth word in str1 is ...
+str1[4]
+
+```
+
+We will return to dealing with strings in a future class, but for now, this is all you need to know.
+
+Of course, as social scientists, we generally want to look at datasets that have multiple dimensions! So, let's start by simply creating a fake dataset of students.
+
+```{r R Creating a fake dataset and messing around with it}
+
+# We create a dataset easily using a base function of data.frame
+
+df <- data.frame(names = c("Roger", "Ayal", "June", "Bjorn", "Todd", 
+                           "Peter", "Thabo", "Florence", "Mishka", "Ife", 
+                           "Mohamed", "Juanita", "Maria", "Max", "Yael", 
+                           "Dana", "Preeti", "Sarah", "Anastasia", "Dawn"),
+                 grade = rnorm(20, mean = 85, sd = 10),
+                 study = rnorm(20, mean = 60, sd = 15))
+
+plot(df$study, df$grade)
+
+grade = rnorm(20, mean = 85, sd = 10)
+study = rnorm(20, mean = 60, sd = 15)
+
+plot(study, grade)
+
+
+
+```
+
+# Getting some real data
+
+While it is really useful to know how to create data frames from scratch, usually you will want to use data that actually represent something! So let's take a look at some actual data frames that we might be interested in.
+
+**Importing data!**
+R has a built in function to import data: `read.csv`
+But we can also use the tidyverse solution: `readr::read_csv`
+Finally, R Studio has an import dataset function in its *Environment* tab
+
+We'll start with the base R functions. They are kind of clunky, but worth knowing.
+
+Let's start with the ANES data: https://electionstudies.org/. You have to register. I downloaded the 2020 data. There is also a package called `anesr` which allows you to simply bring all the data right in: https://github.com/jamesmartherus/anesr
+
+```{r Data - ANES - Doing things the OLD way}
+# Let's import data THE OLD WAY
+anes <- read.csv(file = "Data sets/anes/anes_timeseries_2020_csv_20220210.csv")
+
+# The first thing we ALWAYS DO is to examine our data!
+nrow(anes)
+ncol(anes)
+colnames(anes)
+View(anes)
+
+# We pretty obviously need to look at the codebook. Let's try to find information for the following variables: gender and intention to vote
+
+# Gender = V201600 (1 = male, 2 = female, )
+# What happens if we simply summarize?
+summary(anes$V201600)
+
+# Why does it show up that way?!
+mode(anes$V201600)
+
+# One way to look at the data is to transform the data from numeric to factorial!
+summary(as.factor(anes$V201600))
+
+# Or, we could tabulate the data using table()
+table(anes$V201600)
+
+# What does this tell us?
+
+
+# Who to vote for? = V201033 (1 = Biden, 2 = Trump, 3 = Jorgensen, 4 = Hawkins)
+table(anes$V201033)
+
+# Should we look at the interaction of gender and language?
+## Method 1: table
+table(anes$V201600, anes$V201033) # simply tabulates data by calling the dataset and specific column (using $)
+
+with(anes, table(V201600, V201033)) # We can specify that we are using ANES data by stating "with" first
+
+# Or, we can attach the data to tell R that any object is actually a component of the dataset!
+attach(anes)
+table(V201600, V201033)
+detach(anes)
+
+
+
+
+# We can see that: (a) the variable names are a pain in the butt, and (b) they are often packed with values that we can't use. Let's simplify our lives.
+
+# Create new variables
+
+## Gender
+anes$gender <- NA
+anes$gender[anes$V201600 == 1] <- "Male"
+anes$gender[anes$V201600 == 2] <- "Female"
+anes$gender <- factor(anes$gender)
+summary(anes$gender)
+
+## Vote
+anes$vote <- anes$V201033
+anes$vote <- factor(anes$vote, 
+                    levels = c(-9, -8, -1, 1, 2, 3, 4, 5, 11, 12),
+                    labels = c("Refused", "Don't know", "Inapplicable",
+                               "Joe Biden", "Donald Trump", "Jo Jorgensen",
+                               "Howie Hawkins", "Other", "Don't know", "Refused"))
+
+table(anes$gender, anes$vote)
+
+
+
+## We can actually look at the two candidates that matter
+anes$bt <- NA
+anes$bt[anes$V201033 == 1] <- "Biden"
+anes$bt[anes$V201033 == 2] <- "Trump"
+table(anes$bt)
+mode(anes$bt)
+
+with(anes, table(gender, bt))
+
+# Now we can check out the same thing, but using xtabs
+xtabs(~gender+bt, data = anes)
+
+anes$trump <- NA
+anes$trump[anes$V201033 == 1] <- 0
+anes$trump[anes$V201033 == 2] <- 1
+table(anes$trump)
+mode(anes$trump)
+
+t.test(trump ~ gender, 
+       alternative = "less",
+       conf.level = 0.99,
+       var.equal = TRUE,
+       data = anes)
+
+
+```
+
+```{r Shape down ANES using tidyverse}
+# Now, let's try managing our data using `tidyverse`
+## Bring in the library
+library(tidyverse)
+
+# Now we will use a series of functions to 
+anes2 <- readr::read_csv("Data sets/anes/anes_timeseries_2020_csv_20220210.csv") %>%
+  mutate(gender = factor(V201600,
+                         levels = c(-9, 1, 2),
+                         labels = c("Refused", "Male", "Female")),
+         vote = factor(anes$V201033, 
+                    levels = c(-9, -8, -1, 1, 2, 3, 4, 5, 11, 12),
+                    labels = c("Refused", "Don't know", "Inapplicable",
+                               "Joe Biden", "Donald Trump", "Jo Jorgensen",
+                               "Howie Hawkins", "Other", "Don't know", "Refused"))) %>%
+  select(c(gender, vote)) %>%
+  glimpse()
+
+
+# This is an easy bar plot
+ggplot(data = anes2,
+       aes(x = gender, fill = vote)) +
+  geom_bar()
+
+# Let's position the bars next to each other
+ggplot(data = anes2,
+       aes(x = gender, fill = vote)) +
+  geom_bar(position = position_dodge())
+
+# Let's look at total proportions
+ggplot(data = anes2,
+       aes(x = gender, fill = vote)) +
+  geom_bar(position = position_fill())
+
+# Let's get rid of the "refused" gender, since they're so tiny
+## We can do it by selecting which genders to include ....
+ggplot(data = subset(anes2, gender %in% "Male" | gender %in% "Female"),
+       aes(x = gender, fill = vote)) +
+  geom_bar(position = position_fill())
+
+## Or we can do it by selecting which gender NOT to include ...
+ggplot(data = subset(anes2, !gender %in% "Refused"),
+       aes(x = gender, fill = vote)) +
+  geom_bar(position = position_fill())
+
+
+# Let's mess around with the plot!
+ggplot(data = subset(anes2, !gender %in% "Refused"), # Let's use the anes2 data, but only M/F
+       aes(x = gender, fill = vote)) + # We'll see gender to be on the x axis and the fill color to be how they voted
+  geom_bar(position = position_fill(), # Let's visualize using a bar plot and the position as "fill" to fill to 100%
+           color = "black", size = 1) + # Here we make the border black and the size of the border 1
+  theme(legend.position = "right", # Opening up the theme allows us to mess with the non-geom aspects of the plot
+        panel.background = element_rect(fill = "gray95"), # Set the background color using element_rect
+        panel.border = element_rect(color = "red", 
+                                    linetype = "dashed",
+                                    fill = NA, 
+                                    size = 2), # Set the panel border, remember fill = NA!
+        axis.text.x = element_text(size = 14, angle = 45, hjust = 1), # Mess with x axis text!
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 14, face = "bold", color = "darkgray")) + # Mess with y axis text
+  scale_fill_brewer(palette = "BrBG") + # Determine which color palette to use
+  labs(title = "2020 Elections",
+       subtitle = "Voting by gender",
+       x = "",
+       y = "Proportion voting (observations not equivalent",
+       fill = "Candidate")
+
+```
+
+# Dealing with libraries / packages
+```{r Introducing the here package}
+
+## HERE ###############################
+# One of the most important, but easiest, packages is here(). It makes it super easy to set your entire project at the current location of the project.
+library(here)
+
+# We can initialize here() by simply typing ...
+here()
+
+# Now all we need to do is to use the here command rather than using complex directories!
+anes3 <- read.csv(file = here::here("Data sets", "anes", "anes_timeseries_2020_csv_20220210.csv"))
+
+# This is particularly helpful when we have lots and lots of complex directories or file names.
+
+
+```
+
+Let's bring in some other data
+```{r Data - VDEM - Using tidyverse}
+# Let's bring in the V-Dem data (a major dataset from Gothenburg that basically replaces the Polity IV data).
+
+# Let's look at countries, years, polyarchy (their measurement of democracy) AND let's look at some other potential interesting variables (GDP, civil war, etc.)
+
+vdem <- read_csv(file = here::here("Data sets", "vdem", "vdem" ,"V-Dem-CY-Full+Others-v12.csv")) %>%
+  select(c(country_name, year, e_area, e_regiongeo, v2x_polyarchy, e_gdp)) %>%
+  filter(year >= 1900) %>%
+  mutate(period = if_else(year >= 1900 & year < 1914, "Pre-WWI",
+                          if_else(year >=1914 & year < 1919, "WWI",
+                                  if_else(year >= 1919 & year < 1939, "Inter-War",
+                                          if_else(year >= 1939 & year < 1946, "WWII",
+                                                  if_else(year >= 1946 & year < 1992, "Cold War", "Current era")))))) %>%
+  mutate(period = factor(period, levels = c("Pre-WWI",
+                                            "WWI",
+                                            "Inter-War",
+                                            "WWII",
+                                            "Cold War",
+                                            "Current era"))) %>%
+  glimpse()
+
+
+
+
+# Let's check out what our variables look like.
+## Look at the distribution of the polyarchy variable using a density plot
+## Density plots are basically smoothed out histograms, but rather than showing counts, they show us the kernel density estimation - basically the probability 
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy)) +
+  geom_density()
+
+# Let's break it out by period
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           color = period)) +
+  geom_density()
+
+# Let's go crazy
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           color = period,
+           linetype = period)) +
+  geom_density()
+
+# Let's go ... even crazier.
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           color = period,
+           linetype = period,
+           size = period)) +
+  geom_density()
+
+
+# We can make this look a little nicer
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy)) +
+  geom_density(fill = "white",
+               size = 1) +
+  theme(panel.border = element_rect(fill = NA,
+                                    color = "black",
+                                    size = 1)) +
+  labs(title = "Density of the V-Dem Polyarchy variable",
+       x = "V-Dem Polyarchy variable",
+       y = "Density")
+
+# It might be that we should simply use a histogram
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy)) +
+  geom_histogram(color = "black") +
+  theme(panel.border = element_rect(fill = NA,
+                                    color = "black",
+                                    size = 1)) +
+  labs(title = "Histogram of the V-Dem Polyarchy variable",
+       x = "V-Dem Polyarchy variable",
+       y = "Count")
+
+# Let's break it out by period
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy)) +
+  geom_histogram(color = "black") +
+  theme(panel.border = element_rect(fill = NA,
+                                    color = "black",
+                                    size = 1)) +
+  labs(title = "Histogram of the V-Dem Polyarchy variable",
+       x = "V-Dem Polyarchy variable",
+       y = "Count") +
+  facet_wrap(~period)
+
+# But there's something kind of confusing about this - what?
+
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           fill = period)) +
+  geom_histogram(color = "black",
+                 position = "fill") +
+  theme(panel.border = element_rect(fill = NA,
+                                    color = "black",
+                                    size = 1)) +
+  labs(title = "Histogram of the V-Dem Polyarchy variable",
+       x = "V-Dem Polyarchy variable",
+       y = "Count")
+
+
+
+
+# Now we can start to interact two variables together
+## How about a scatterplot of polyarchy and GDP?
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = e_gdp)) +
+  geom_point()
+
+# Well, that looks insane. Let's log our GDP.
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = log(e_gdp + 1))) +
+  geom_point()
+
+# Okay, that looks better. But we can start to examine the data a bit more.
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = log(e_gdp + 1),
+           color = year)) +
+  geom_point()
+
+
+# Let's differentiate the colors a bit
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = log(e_gdp + 1),
+           color = year)) +
+  geom_point() +
+  scale_color_continuous(type = "viridis")
+
+# What abotu simplifying?
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = log(e_gdp + 1),
+           color = year)) +
+  geom_point() +
+  scale_color_binned(type = "viridis")
+
+
+# Now let's break it out by time period
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = log(e_gdp + 1),
+           color = year)) +
+  geom_point() +
+  scale_color_binned(type = "viridis") +
+  facet_wrap(~period)
+
+# Now spiff it up.
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = log(e_gdp + 1),
+           color = year)) +
+  geom_point() +
+  scale_color_binned(type = "viridis") +
+  facet_wrap(~period) +
+  theme(panel.border = element_rect(fill = NA, color = "black"),
+        strip.background = element_rect(fill = "white"),
+        strip.text = element_text(face = "bold", size = 10)) +
+  labs(title = "Examining Polyarchy and GDP by era",
+       x = "V-Dem Polyarchy variable",
+       y = "Log of GDP",
+       color = "Year")
+
+
+# It might be helpful to add a regression line!
+ggplot(data = vdem,
+       aes(x = v2x_polyarchy,
+           y = log(e_gdp + 1),
+           color = year)) +
+  geom_point() +
+  geom_smooth(method = 'lm', formula = y~x) + # <- an easy way to add the line :)
+  scale_color_binned(type = "viridis") +
+  facet_wrap(~period) +
+  theme(panel.border = element_rect(fill = NA, color = "black"),
+        strip.background = element_rect(fill = "white"),
+        strip.text = element_text(face = "bold", size = 10)) +
+  labs(title = "Examining Polyarchy and GDP by era",
+       x = "V-Dem Polyarchy variable",
+       y = "Log of GDP",
+       color = "Year")
+
+
+# Someone tell me about these plots. What do we learn?
+# General takeaway?
+# Skedasticity?
+# WWMSS? What would Mike Salamone Say?
+
+```
+
+Having done some core visualization, let's try a quick regression (OLS)
+```{r OLS - VDEM}
+# Why is it appropriate to use OLS for this?
+
+ols.vd.1 <- lm(log(e_gdp+1) ~ v2x_polyarchy,
+               data = vdem)
+
+# Look quickly at this and someone tell me what it means .. but be careful, there's a trap (think log-lin)
+summary(ols.vd.1)
+
+# We might also wonder about how robust these standard errors are, for two reasons
+# A - robustness against heteroskedasticity
+
+# So let's load in some packages to deal with them
+
+library("lmtest")
+library("sandwich")
+
+coeftest(ols.vd.1, 
+         vcov = vcovHC,
+         type = "HC0")
+
+# And what the heck is HC0"!? There are different HC estimators. Honestly, I don't know much about them. HC0 is the OG.
+
+# There are many more post-estimation tests to run here: https://www.r-econometrics.com/methods/hcrobusterrors/
+
+# But what about clustering? Why should we care about clustering standard errors?
+
+
+
+
+# We can cluster our standard errors around the era, for example:
+coeftest(ols.vd.1, 
+         vcov = vcovHC,
+         type = "HC0",
+         df = 5,
+         cluster = ~period)
+
+
+
+# This is also an excellent explainer! https://evalf21.classes.andrewheiss.com/example/standard-errors/
+
+# We can also cluster our standard errors around the region!
+coeftest(ols.vd.1, 
+         vcov = vcovCL,
+         type = "HC0",
+         df = 5,
+         cluster = ~e_regiongeo)
+
+
+```
+
+
+

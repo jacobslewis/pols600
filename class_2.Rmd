@@ -1,0 +1,373 @@
+---
+title: "Lesson 2 - Thinking about Data"
+author: "Jacob S. Lewis"
+date: "2022-08-04"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Overview
+Today's lesson will cover a few things
+
+1. Discussing briefly Chapters 1 & 2 of *Thinking Clearly With Data*
+2. How data are generated
+3. Cleaning data
+4. Visualizing data
+5. Chris Achen's piece
+6. Interpreting and visualizing the results of a linear regression
+
+**Hey! Where's the maximum likelihood, buddy?**
+
+Don't worry. We're going to get there. But this class is about more than just MLE & Hierarchy ... it's about really understanding what's going on in your data, your models, etc.
+
+# Working with a simple regression
+
+```{r Libraries}
+library(tidyverse)
+library(coefplot)
+library(arm)
+library(sandwich)
+library(here)
+library(lmtest)
+library(olsrr)
+library(marginaleffects)
+```
+
+Set the working directory with here()
+```{r Here}
+here()
+```
+
+```{r Data - V-Dem import}
+
+# Because we've brought in some other packages, we have a conflict with the select function. So we specify that it is from dplyr.
+
+vdem <- read_csv(file = here::here("Data sets", "vdem", "vdem" ,"V-Dem-CY-Full+Others-v12.csv")) %>%
+  dplyr::select(c(country_name, year, e_regiongeo, v2x_polyarchy, v2smcamp, v2smpolsoc, v2smpolhate)) %>%
+  dplyr::filter(year >= 2000)
+```
+
+```{r OLS - V-Dem}
+# For the sake of having something interesting to examine, let's take a look at whether social media correlates to democracy
+
+vd.1 <- lm(v2x_polyarchy ~ v2smcamp + v2smpolsoc + v2smpolhate, data = vdem)
+summary(vd.1)
+
+vd.2 <- lmtest::coeftest(vd.1,
+                           vcov = vcovHC,
+                           type = "HC0",
+                           df = 5,
+                           cluster = ~country_name)
+vd.2
+
+
+# Is there anything we should consider before we interpret this model?
+
+# What about multicollinearity? Let's start with the basics ... Variance Inflation Factors
+olsrr::ols_vif_tol(vd.1)
+
+# That's good - we probably don't have any major multicollinearity since our tolerances are high (we want them above 0.1) and our VIF is relatively low (we want them below 10, generally)
+
+# We can also look at Condition Indices to see whether we have MC
+olsrr::ols_eigen_cindex(vd.1)
+
+# Again, we have good news here. None of our conditions are between 10 and 30.
+
+```
+
+Now, let's start by visualizing the raw model. The original R way to do this is to simply plot the residuals of your model with `plot()`
+```{r Boring R plot of model residuals}
+plot(vd.1)
+```
+
+We can also do this through ggplot!
+```{r Slightly less boring residual plots with ggplot!}
+
+# Manually extracting residuals and fitted values and then using a standard geom_point()
+library(broom)
+
+vd.3 <- broom::augment(vd.1)
+ggplot(data = vd.3, aes(x = .fitted, y = .resid)) + 
+  geom_point()
+
+
+# Or we can use the autoplot function of ggfortify!
+library(ggfortify)
+autoplot(vd.1)
+
+
+```
+
+This is great for checking the overall model fit, but it is less helpful for interpreting what the heck your model actually says!
+
+**The Coefplot package!**
+This is an easy way to plot the unstandardized coefficients of your model. It uses ggplot as a base.
+```{r Coefplot}
+coefplot::coefplot(vd.1,
+                   horizontal = TRUE)
+
+```
+
+Okay, that's helpful, I guess. In some cases, it's really awesome to plot out coefficients - especially if you want to test the robustness of a significant result, or if you want to focus in on the coefficient of a single variable across many models. But generally, we want to interpret our models so that we can explain it to anyone!
+
+What if we wanted to manually model these through ggplot?
+Well ... we can actually just snag the numbers directly from the model object.
+
+```{r Coefplots ... the "hard" way!}
+
+# Let's create a data frame in which we snag the coefficients and the standard errors
+coefs <- data.frame(variable = c("Intercept", "SM Campaigning", "Polarization", "SM Hate Speech"),
+                    order = 1:4,
+                    coefs = vd.1$coefficients,
+                    stderr = se.coef(vd.1))
+
+# What does this look like?
+coefs
+
+# Now let's plot these out with ggplot!
+# Let's start with some easy points and error bars
+ggplot(data = coefs,
+       aes(x = reorder(variable, order),
+       y = coefs)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = coefs - 1.96*stderr,
+                    ymax = coefs + 1.96*stderr),
+                width = 0.5) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed") +
+  theme(panel.border = element_rect(fill = NA, color = "black")) +
+  labs(title = "Coefficient plot for our awesome OLS",
+       subtitle = "Using geom_errorbar()",
+       x = "",
+       y = "Coefficient")
+
+# Okay, that's good ... but ugly! Let's make it look nicer.
+ggplot(data = coefs,
+       aes(x = reorder(variable, order),
+       y = coefs)) +
+  geom_point() +
+  geom_pointrange(aes(ymin = coefs - 1.96*stderr, # Now let's put in 95 % Conf. Intervals
+                    ymax = coefs + 1.96*stderr),
+                 size = 0.5) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed") +
+  theme(panel.border = element_rect(fill = NA, color = "black")) +
+  labs(title = "Coefficient plot for our awesome OLS",
+       subtitle = "Using geom_pointrange()",
+       x = "",
+       y = "Coefficient")
+
+```
+
+**Predictions**
+Bootstrapping our predictions.
+Why? Because it's good to suffer. It builds character.
+```{r Bootstrapping predictions}
+
+# Let's create a new vdem dataframe to put our predictions in
+vdem2 <- vdem
+
+# Now we can do a bunch of cool stuff. First, we can just plot out our  predictions. Let's pull them directly from our model. We know the formula for a simple OLS regression, so we can simply recreate it using the coefficients from the model and the actual observed values in the dataset!
+
+vdem2$preds <- ((summary(vd.1)[[4]][1,1] * 1) +
+                  (summary(vd.1)[[4]][2,1] * vdem2$v2smcamp) +
+                  (summary(vd.1)[[4]][3,1] * vdem2$v2smpolsoc) +
+                  (summary(vd.1)[[4]][4,1] * vdem2$v2smpolhate))
+
+
+# This is pretty cool because we can then check out our predictions and our observed values
+ggplot(data = vdem2) +
+  geom_point(aes(x = v2smcamp,
+                 y = v2x_polyarchy),
+             color  = "gray") +
+  geom_point(aes(x = v2smcamp,
+                 y = preds),
+             color = "black") +
+  theme(panel.background = element_rect(fill = "white"))
+
+# If we wanted to really impress someone at a conference, we could show our predictions in a beautiful plot suitable for a manuscript!
+
+ggplot(data = vdem2,
+       aes(v2smcamp,
+           y = preds,
+           color = year)) +
+  geom_point() +
+  geom_smooth() +
+  geom_hline(yintercept = 0.50, linetype = "dashed") +
+  geom_vline(xintercept = 0.00, linetype = "dashed") +
+  scale_color_binned(type = "viridis") +
+  theme(panel.border = element_rect(fill = NA, color = "black", size = 1.5))  +
+  labs(title = "Predicted polyarchy based on the use of social media by political campaigns",
+       x = "Use of social media by political campaigns",
+       y = "Predicted polyarchy score",
+       color = "Year")
+
+```
+
+Let's take a moment, though. We're "predicting" polyarchy via social media use. Are there any other ways we could look at this? What might a reviewer object to?
+
+
+
+
+One of the great things about bootstrapping is that we can completely control what our predictions are. So what if we want to see what our predictions look like if we fix our social media campaign variable at different levels?
+
+```{r Create specific fixed x interval predictions}
+vdem2$preds_sm0 <- ((summary(vd.1)[[4]][1,1] * 1) +
+                  (summary(vd.1)[[4]][2,1] * 0) + # Force the value of social media use by campaigns to be 0
+                  (summary(vd.1)[[4]][3,1] * vdem2$v2smpolsoc) +
+                  (summary(vd.1)[[4]][4,1] * vdem2$v2smpolhate))
+
+vdem2$preds_sm1 <- ((summary(vd.1)[[4]][1,1] * 1) +
+                  (summary(vd.1)[[4]][2,1] * 1) + # Force the value of social media use by campaigns to be 1
+                  (summary(vd.1)[[4]][3,1] * vdem2$v2smpolsoc) +
+                  (summary(vd.1)[[4]][4,1] * vdem2$v2smpolhate))
+
+vdem2$preds_sm2 <- ((summary(vd.1)[[4]][1,1] * 1) +
+                  (summary(vd.1)[[4]][2,1] * 2) + # Force the value of social media use by campaigns to be 2
+                  (summary(vd.1)[[4]][3,1] * vdem2$v2smpolsoc) +
+                  (summary(vd.1)[[4]][4,1] * vdem2$v2smpolhate))
+
+vdem2$preds_sm3<- ((summary(vd.1)[[4]][1,1] * 1) +
+                  (summary(vd.1)[[4]][2,1] * 3) + # Force the value of social media use by campaigns to be 3
+                  (summary(vd.1)[[4]][3,1] * vdem2$v2smpolsoc) +
+                  (summary(vd.1)[[4]][4,1] * vdem2$v2smpolhate))
+
+# Let's look at what this does to our data:
+View(vdem2)
+glimpse(vdem2)
+
+
+```
+
+Of course, now we have set our x axis to four intervals (0:3), so a continuous plot won't work! How can we plot this out? A bar plot! For a bar plot, we need two core things: a mean value (of all the predictions) and the standard error of the values. We can easily get this via dplyr.
+
+Let's explore reshaping our data. In the end, we want our data to look like this:
+
+social media      mean value        standard error
+------------     -----------        --------------
+      0              0.569                0.002
+      1              0.652                0.002
+      2              0.734                0.002
+      3              0.817                0.002
+
+Your standard errors won't always be uniform like this ... this just sort of happened!
+```{r Reshaping data for visualization}
+sm <- vdem2 %>%
+  dplyr::select(c(preds_sm0, preds_sm1, preds_sm2, preds_sm3)) %>% # Select only the variables we want to deal with
+  pivot_longer(cols = everything(), # change our data to "long format"
+               names_to = "soc_media", # Tell dplyr what to name our category variable
+               values_to = "preds") # Tell dplyr what to name our prediction values!
+
+# What does this look like?
+sm
+
+# Our data are now in "long format," which is very helpful when using the tidyverse and ggplot. But we want to basically use a mathematical formula to get our means and standard errors.
+
+
+sm <- vdem2 %>%
+  dplyr::select(c(preds_sm0, preds_sm1, preds_sm2, preds_sm3)) %>%
+  pivot_longer(cols = everything(),
+               names_to = "soc_media",
+               values_to = "preds") %>%
+  group_by(soc_media) %>% # Tell dplyr to group our summaries by values in the soc_media column
+  summarise(obs = n(), # Collect the number of observations
+            mval = mean(preds, na.rm = TRUE), # Generate the mean, removing any NA values (that mess up calculations)
+            sd_mval = sd(preds, na.rm = TRUE)) %>% # Generate the standard deviation so that we can create the standard error
+  mutate(stderr = sd_mval/sqrt(obs), # Easily calculate standard error!
+         soc_media = forcats::fct_recode(soc_media,
+                                          "SM Campaigning: 0" = "preds_sm0",
+                                          "SM Campaigning: 1" = "preds_sm1",
+                                          "SM Campaigning: 2" = "preds_sm2",
+                                          "SM Campaigning: 3" = "preds_sm3"))
+
+# Now let's look at the data:
+sm
+
+# Perfecto!
+
+# Okay, let's plot it out in the simplest way possible: a bar plot
+ggplot(data = sm,
+       aes(x = soc_media,
+           y = mval)) +
+  geom_bar(stat = "summary",
+           color = "black",
+           fill = "gray") +
+  geom_errorbar(aes(ymin = mval - 3.291*stderr,
+                    ymax = mval + 3.291*stderr),
+                width = 0.5) +
+  coord_cartesian(ylim = c(0, 1)) +
+  theme(panel.border = element_rect(color = "black", fill = NA),
+        axis.text = element_text(size = 11),
+        axis.title = element_text(size = 12, face = "bold")) +
+  labs(title = "Predicted polyarchy score based on social media campaigning by political parties",
+       subtitle = "Calculated with 99.9 confidence intervals",
+       x = "",
+       y = "Predicted polyarchy")
+
+
+
+
+```
+
+Marginal Effects package
+```{r Using the marginal effects}
+
+# Use the marginal effects package
+# We can simply feed the model into the predictions(), tell the function that we want to put the results of the margins in a new data grid, and then tell the function which values we want to set our social media campaign variable to!
+marginaleffects::predictions(vd.1, newdata = datagrid(v2smcamp = c(0, 1, 2, 3)))
+
+# Because we are using successive intervals, we can also just use the X:X approach!
+marginaleffects::predictions(vd.1, newdata = datagrid(v2smcamp = 0:3))
+
+
+# Now, how accurate were our bootstrapped estimates?
+sm
+
+# Pretty close!
+
+# Now, if we want to simply plot the marginal effects, we can do so easily:
+marginaleffects::plot_cap(vd.1, condition = c("v2smcamp"))
+
+# Honestly, that's kind of boring compared to the other stuff we've done! But ... there are some awesome interactions we can do.
+
+marginaleffects::plot_cap(vd.1, condition = c("v2smcamp", "v2smpolsoc"))
+
+# Now we can see what the marginal effects of Social Media Campaigning are at different values of Political partisanship.
+
+# what about the impact stratified by the amount of hate speech?
+marginaleffects::plot_cap(vd.1, condition = c("v2smcamp", "v2smpolhate"))
+
+
+# We've calculated the predictions. But what about the marginal effects themselvs?
+
+mfx <- marginaleffects::marginaleffects(vd.1)
+mfx
+head(mfx)
+summary(mfx)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
