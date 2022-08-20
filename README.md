@@ -44,7 +44,7 @@ You are going to need to install several pieces of software in order to succeed 
 
 ## Week 1 - The basics of working with R
 1. R, R Studio, and R Markdown
-2. Packages: Tidyverse, Here
+2. Packages: `Tidyverse`, `Here`
 3. Data sources: ACLED, V-Dem, World Bank, ANES.
 4. Workspaces, loading data, etc.
 
@@ -80,7 +80,7 @@ You are going to need to install several pieces of software in order to succeed 
 3. How the heck do we make predictions?
 
 ## Week 7 - Multilevel / Hierarchical models
-1. LME4 package
+1. `LME4` package
 2. What are the advantages of hierarchical modeling?
 3. Why not just cluster your standard errors?
 4. What do we structure our levels at? (Hint: theory, theory, theory! Data, data, data!)
