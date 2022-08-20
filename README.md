@@ -53,7 +53,7 @@ You are going to need to install several pieces of software in order to succeed 
 1. Thinking about Data: why does it matter, what is it
 2. Data generation
 3. Cleaning data
-4. Visualizing data (ggplot vs. R Base)
+4. Visualizing data (`ggplot2` vs. R Base)
 
 ## Week 3 - Maximum Likelihood Estimation (MLE)
 **Reading**
