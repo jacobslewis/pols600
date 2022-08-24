@@ -52,7 +52,7 @@ You are going to need to install several pieces of software in order to succeed 
 4. Workspaces, loading data, etc.
 
 ## Week 2 - Data: thinking about it, interpreting results, and visualizing predictions.
-**Reading** - [Achen](https://journals.sagepub.com/doi/10.1080/07388940500339167), TCWD Chapter 2
+**Reading** - [Achen 2002](https://www.annualreviews.org/doi/abs/10.1146/annurev.polisci.5.112801.080943), [Achen 2005](https://journals.sagepub.com/doi/10.1080/07388940500339167), and TCWD Chapter 2
 1. Thinking about Data: why does it matter, what is it
 2. Data generation
 3. Cleaning data
