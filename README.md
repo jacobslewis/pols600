@@ -1,5 +1,8 @@
 # POL S 600 - Advanced Quantitative Methods
 
+# Meeting time
+We will meet on select Fridays (starting the 26th of August) from 10 AM to 11:30 AM. I am hoping to use Slack, but we may use Zoom if I can't make Slack work.
+
 # Introduction
 Welcome to **POL S 600**! This semester, we will build on the methods that were learned in the introductory stats course offered to PPPA graduate students. We should plan to meet about 8 times or so (every other week, approximately), probably on Fridays via Zoom or Slack.
 
