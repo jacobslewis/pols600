@@ -58,43 +58,42 @@ You are going to need to install several pieces of software in order to succeed 
 3. Cleaning data
 4. Visualizing data (`ggplot2` vs. R Base)
 
-## Week 3 - Maximum Likelihood Estimation (MLE)
-**Reading**
+## Week 3 - Maximum Likelihood Estimation (MLE) & Binary Response Models
 1. Why use Max. Likelihood Models?
 2. Differences from OLS
 3. Connection to “real world” – data generation, collection, etc.
 4. How much math do we really need to know?
+5. Logits & Probits
+6. Transformations(invlogit via arm)
+7. Predictions
+8. CDF vs. PDF
 
-## Week 4 - Binary Response Models
-1. Logits & Probits
-2. Transformations(invlogit via arm)
-3. Predictions
-4. CDF vs. PDF
-
-## Week 5 - Ordinal Response Models
+## Week 4 - Ordinal Response Models
 1. When do we use ordinal response models?
 2. Why are they important to understand?
 3. Why can’t we just use OLS?
 4. Using the `Ordinal` package
 
-## Week 6 - Count models
+## Week 5 - Count models
 1. What is a count model? Why not just use OLS?
 2. Poisson distributions
 3. How the heck do we make predictions?
 
-## Week 7 - Multilevel / Hierarchical models
+## Week 6 - Multilevel / Hierarchical models
 1. `LME4` package
 2. What are the advantages of hierarchical modeling?
 3. Why not just cluster your standard errors?
 4. What do we structure our levels at? (Hint: theory, theory, theory! Data, data, data!)
 5. Why not just use fixed effects models?
 
-## Week 8 - Random slopes and intercepts
+## Week 7 - Random slopes and intercepts
 1. What are the advantages of random slopes and intercepts?
 2. What are the disadvantages?
 3. Which variables to include in the mixed effects portion of the model?
 
-
-
-
+## Week 8 - When Good Models Go Bad
+1. Why isn't my ML model maximizing?
+2. Did I just produce statistical mush?
+3. Singular binding
+4. Looping through levels
 
