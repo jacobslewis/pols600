@@ -1,0 +1,403 @@
+---
+title: "Lesson 3 - Max. Likelihood & Binomial Response Models"
+author: "Jacob S. Lewis"
+date: "2022-08-17"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r Libraries}
+library(tidyverse)
+library(marginaleffects)
+library(modelsummary)
+```
+
+
+
+Finally! We're going to talk about **maximum likelihood**
+
+# Discussion topics
+1. Why use Max. Likelihood Models?
+2. Differences from OLS
+3. Connection to “real world” – data generation, collection, etc.
+4. How much math do we really need to know?
+5. Logits & Probits
+6. Transformations(invlogit via arm)
+7. Predictions
+8. CDF vs. PDF
+
+*Jacob goes on a rant about the use and misuse of OLS*
+
+# Differences from OLS
+
+```{r Data - V-Dem import}
+
+# Because we've brought in some other packages, we have a conflict with the select function. So we specify that it is from dplyr.
+
+vdem <- read_csv(file = here::here("Data sets", "vdem", "vdem" ,"V-Dem-CY-Full+Others-v12.csv")) %>%
+  dplyr::select(c(country_name, year, e_regiongeo, v2elaccept, v2elaccept_ord, e_miinterc)) %>%
+  dplyr::filter(year >= 1945)
+
+vdem$region <- NA
+vdem$region[vdem$e_regiongeo == 1] <- "Western Europe"
+vdem$region[vdem$e_regiongeo == 2] <- "Northern Europe"
+vdem$region[vdem$e_regiongeo == 3] <- "Southern Europe"
+vdem$region[vdem$e_regiongeo == 4] <- "Eastern Europe"
+vdem$region[vdem$e_regiongeo == 5] <- "Northern Africa"
+vdem$region[vdem$e_regiongeo == 6] <- "Western Africa"
+vdem$region[vdem$e_regiongeo == 7] <- "Middle Africa"
+vdem$region[vdem$e_regiongeo == 8] <- "Eastern Africa"
+vdem$region[vdem$e_regiongeo == 9] <- "Southern Africa"
+vdem$region[vdem$e_regiongeo == 10] <- "Western Asia"
+vdem$region[vdem$e_regiongeo == 11] <- "Central Asia"
+vdem$region[vdem$e_regiongeo == 12] <- "Eastern Asia"
+vdem$region[vdem$e_regiongeo == 13] <- "South-Eastern Asia"
+vdem$region[vdem$e_regiongeo == 14] <- "Southern Asia"
+vdem$region[vdem$e_regiongeo == 15] <- "Oceania"
+vdem$region[vdem$e_regiongeo == 16] <- "North America"
+vdem$region[vdem$e_regiongeo == 17] <- "Central America"
+vdem$region[vdem$e_regiongeo == 18] <- "South America"
+vdem$region[vdem$e_regiongeo == 19] <- "Caribbean"
+table(vdem$region)
+
+# We can simplify this further
+vdem$region2 <- NA
+vdem$region2[vdem$e_regiongeo == 1] <- "Europe"
+vdem$region2[vdem$e_regiongeo == 2] <- "Europe"
+vdem$region2[vdem$e_regiongeo == 3] <- "Europe"
+vdem$region2[vdem$e_regiongeo == 4] <- "Europe"
+vdem$region2[vdem$e_regiongeo == 5] <- "MENA"
+vdem$region2[vdem$e_regiongeo == 6] <- "Africa"
+vdem$region2[vdem$e_regiongeo == 7] <- "Africa"
+vdem$region2[vdem$e_regiongeo == 8] <- "Africa"
+vdem$region2[vdem$e_regiongeo == 9] <- "Africa"
+vdem$region2[vdem$e_regiongeo == 10] <- "MENA"
+vdem$region2[vdem$e_regiongeo == 11] <- "Asia"
+vdem$region2[vdem$e_regiongeo == 12] <- "Asia"
+vdem$region2[vdem$e_regiongeo == 13] <- "Asia"
+vdem$region2[vdem$e_regiongeo == 14] <- "Asia"
+vdem$region2[vdem$e_regiongeo == 15] <- "Oceania"
+vdem$region2[vdem$e_regiongeo == 16] <- "North America"
+vdem$region2[vdem$e_regiongeo == 17] <- "Lat. Am/Carr."
+vdem$region2[vdem$e_regiongeo == 18] <- "Lat. Am/Carr."
+vdem$region2[vdem$e_regiongeo == 19] <- "Lat. Am/Carr."
+table(vdem$region2)
+
+xtabs(~country_name + region2, data = vdem)
+
+vdem$region2 <- factor(vdem$region2)
+
+```
+
+Election losers accept results (C) (v2elaccept)
+Question: Did losing parties and candidates accept the result of this national election within three
+months?
+Responses:
+0: None. None of the losing parties or candidates accepted the results the election, or all
+opposition was banned.
+1: A few. Some but not all losing parties or candidates accepted the results but those who
+constituted the main opposition force did not.
+2: Some. Some but not all opposition parties or candidates accepted the results but it is
+unclear whether they constituted a major opposition force or were relatively insignificant.
+3: Most. Many but not all opposition parties or candidates accepted the results and those who
+did not had little electoral support.
+4: All. All parties and candidates accepted the results.
+
+```{r continuous versus ordinal data}
+
+# We can look at the spread of election acceptance using continuous data
+ggplot(data = vdem,
+       aes(x = v2elaccept,
+           y = region2)) +
+  geom_point()
+
+# We can also look at the distribution via a histogram
+ggplot(data = vdem,
+       aes(x = v2elaccept,
+           fill = region2)) +
+  geom_histogram(color = "black") +
+  facet_wrap(~region2, 
+             ncol = 1,
+             scales = "free_y")
+
+# But hang on a moment. These data are beautiful ... but are they REAL?!
+
+ggplot(data = vdem,
+       aes(x = v2elaccept_ord,
+           fill = region2)) +
+  geom_bar() +
+  facet_wrap(~region2,
+             ncol = 1,
+             scales = "free_y")
+
+
+```
+
+So, why should we care about this at all?
+
+Partly because of the data generating process. We should really understand what our data actually say and represent.
+
+It's really, really tempting to use continuous data, but remember that these data are collected as ordinal categories. In other cases, data are collected as binary outcomes, multinomial categories, or counts. Each of these types of data have different assumptions and distributions that our models need to address.
+
+Looking at a Probability density function (PDF)
+```{r PDF}
+ggplot(data = data.frame(x = c(-3, 3)), aes(x)) +
+  stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) + ylab("") +
+  scale_y_continuous(breaks = NULL)
+```
+
+Looking at a Cumulative density function (CDF)
+```{r CDF}
+
+# create sample dataframe for upper and lower limit
+sample_limit<- data.frame(x = c(-10, 10))
+
+# draw CDF Plot
+ggplot(sample_limit, aes(x = x)) +
+				stat_function(fun = pnorm)
+
+```
+
+What does a Poisson distribution look like?
+```{r Poisson}
+ggplot(data.frame(x = 0:10), aes(x)) +
+  stat_function(geom = "point", n = 11, fun = dpois, args = list(lambda = 1.5)) +
+  theme_bw()+
+  scale_x_continuous(breaks = 0:10)
+
+ggplot(data.frame(x = 0:10), aes(x)) +
+  stat_function(geom = "point", n = 11, fun = dpois, args = list(lambda = 2.5)) +
+  theme_bw()+
+  scale_x_continuous(breaks = 0:10)
+
+```
+
+
+# Moving in to binomial models
+
+Binomial models are those with a dependent variable that is discrete and bounded in set {0,1}
+
+What does that mean? In English, when your outcome can either happen (1) or not happen (0). That's it!
+
+
+```{r Bring in the ACLED data}
+
+# Bring in the ACLED data
+acled <- read_csv(here::here("Data sets", "acled.csv")) %>%
+  mutate(date = lubridate::dmy(event_date)) %>%
+  filter(event_type %in% "Protests") %>%
+  mutate(repressed = if_else(sub_event_type %in% "Protest with intervention", 1, 
+                             if_else(sub_event_type %in% "Excessive force against protesters", 1, 0)),
+         student = if_else(grepl("student", assoc_actor_1, ignore.case = TRUE), 1, 0)) %>%
+  arrange(country, admin1, admin2, date) %>%
+  group_by(country, admin1, admin2) %>%
+  mutate(rep_lag = lag(repressed),
+         momentum_30day = purrr::map_int(date, ~sum(date >= (.x - 30) & date <= (.x)))) %>%
+  ungroup()
+```
+
+Let's run a really simple multivariate regression to see when governments repress their citizens
+**Variable 1** = Students are involved
+**Variable 2** = Last local protest was repressed
+**Variable 3** = number of protests in region within last 30 days
+
+```{r Check out the data}
+# Check out the distribution of our variables
+table(acled$student)
+table(acled$rep_lag)
+summary(acled$momentum_30day)
+
+# Whoah - that variable looks a little crazy. Let's visualize it.
+ggplot(data = acled,
+       aes(x = momentum_30day)) +
+  geom_histogram()
+
+# Well would you look at that! It looks like a ... (drum roll, please) ... POISSON DISTRIBUTION!!!!!!
+# Because the data are skewed, we can try to normalize them by logging them.
+
+acled$lmomentum <- log(acled$momentum_30day + 1)
+
+ggplot(data = acled,
+       aes(x = lmomentum)) +
+  geom_histogram()
+```
+
+```{r Run some core regressions}
+
+# First, we'll run bivariate regressions
+log.rep.1 <- glm(repressed ~ student, family = binomial(link = "logit"), data = acled)
+log.rep.2 <- glm(repressed ~ rep_lag, family = binomial(link = "logit"), data = acled)
+log.rep.3 <- glm(repressed ~ lmomentum, family = binomial(link = "logit"), data = acled)
+log.rep.4 <- glm(repressed ~ student + rep_lag + lmomentum, family = binomial(link = "logit"), data = acled)
+
+modelsummary::modelsummary(models = list(log.rep.1, log.rep.2, log.rep.3, log.rep.4),
+                           stars = TRUE)
+
+
+# Now we can run the same models, but using probits
+prb.rep.1 <- glm(repressed ~ student, family = binomial(link = "probit"), data = acled)
+prb.rep.2 <- glm(repressed ~ rep_lag, family = binomial(link = "probit"), data = acled)
+prb.rep.3 <- glm(repressed ~ lmomentum, family = binomial(link = "probit"), data = acled)
+prb.rep.4 <- glm(repressed ~ student + rep_lag + lmomentum, family = binomial(link = "probit"), data = acled)
+
+modelsummary::modelsummary(models = list(prb.rep.1, prb.rep.2, prb.rep.3, prb.rep.4),
+                           stars = TRUE)
+
+
+# What do these models tell us?
+# Which model is the best fit to the data?
+# Would Chris Achen be okay with these models?
+
+```
+
+# Generating predictions
+It's convenient to want to simply read out a coefficient table and act like we can interpret it. In logit models, for example, it would be nice to simply talk about the log-odds produced by a logit coefficient:
+
+```{r Log odds for models 1-3}
+
+exp(coef(log.rep.1)[[2]])
+exp(coef(log.rep.2)[[2]])
+exp(coef(log.rep.3)[[2]])
+```
+
+But, as we know, interpreting log odds is very difficult when we have multiple variables in our models. Let's generate predictions:
+
+```{r Bootstrapping predictions}
+# Bootstrapping à la Hanmer and Kalkan 2013, baby!
+acled$pred_rep <- arm::invlogit((coef(log.rep.4)[[1]] * 1) +
+                                  (coef(log.rep.4)[[2]] * acled$student) +
+                                  (coef(log.rep.4)[[3]] * acled$rep_lag) +
+                                  (coef(log.rep.4)[[4]] * acled$lmomentum))
+
+# Let's check out our summary
+summary(acled$pred_rep)
+
+
+# Now let's check out the effect of students being there and not being there
+## Students NOT present
+acled$pred_rep0 <- arm::invlogit((coef(log.rep.4)[[1]] * 1) +
+                                  (coef(log.rep.4)[[2]] * 0) +
+                                  (coef(log.rep.4)[[3]] * acled$rep_lag) +
+                                  (coef(log.rep.4)[[4]] * acled$lmomentum))
+summary(acled$pred_rep0)
+
+
+## Students present
+acled$pred_rep1 <- arm::invlogit((coef(log.rep.4)[[1]] * 1) +
+                                  (coef(log.rep.4)[[2]] * 1) +
+                                  (coef(log.rep.4)[[3]] * acled$rep_lag) +
+                                  (coef(log.rep.4)[[4]] * acled$lmomentum))
+summary(acled$pred_rep1)
+
+# What do we notice as the difference between them?
+
+# Visualize them?
+## Let's do it the old-school way
+
+m.st0 <- mean(acled$pred_rep0, na.rm = TRUE)
+se.st0 <- sd(acled$pred_rep0, na.rm = TRUE)/sqrt(nrow(acled))
+m.st1 <- mean(acled$pred_rep1, na.rm = TRUE)
+se.st1 <- sd(acled$pred_rep1, na.rm = TRUE)/sqrt(nrow(acled))
+
+df <- data.frame(student = c("No students", "Students"),
+                 mean = c(m.st0, m.st1),
+                 stderr = c(se.st0, se.st1),
+                 order = 1:2)
+
+
+df
+
+ggplot(data = df,
+       aes(x = reorder(student, order),
+           y = mean)) + 
+  geom_bar(stat = "identity",
+           fill = "gray90",
+           color = "black") +
+  geom_errorbar(aes(ymin = mean - 1.96*stderr,
+                    ymax = mean + 1.96*stderr),
+                width = 0.5) +
+  coord_cartesian(ylim = c(0.035, 0.05))
+```
+
+We can also use the excellent `predictions` function from `marginaleffects`
+```{r Marginal Effects Predictions}
+# Plot out the effect of students on their own
+marginaleffects::predictions(log.rep.4, newdata = datagrid(student = c(0,1))) %>%
+  ggplot(aes(x = student,
+             y = predicted)) +
+  geom_bar(stat = "identity",
+           fill = "gray95",
+           color = "black") +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                width = 0.5)
+
+# Now we can add in a complication
+marginaleffects::predictions(log.rep.4, newdata = datagrid(student = c(0,1), lmomentum = c(0:5))) %>%
+  ggplot(aes(x = lmomentum,
+             y = predicted,
+             fill = factor(student))) +
+  geom_bar(stat = "identity",
+           position = position_dodge(),
+           color = "black") +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                position = position_dodge(0.9)) +
+  labs(title = "Predicted probabilities of government repression",
+       x = "Log of previous momentum in past 30 days",
+       y = "Predicted likelihood of government repression",
+       fill = "Students present?") +
+  theme(panel.border = element_rect(fill = NA, color = "black"))
+
+# Shall we fully complicate the model?
+marginaleffects::predictions(log.rep.4, 
+                             newdata = datagrid(student = c(0,1), 
+                                                lmomentum = c(0:5),
+                                                rep_lag = c(0,1))) %>%
+  ggplot(aes(x = lmomentum,
+             y = predicted,
+             fill = factor(student))) +
+  geom_bar(stat = "identity",
+           position = position_dodge(),
+           color = "black") +
+  facet_wrap(~rep_lag) +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                position = position_dodge(0.9)) +
+  labs(title = "Predicted probabilities of government repression",
+       x = "Log of previous momentum in past 30 days",
+       y = "Predicted likelihood of government repression",
+       fill = "Students present?") +
+  theme(panel.border = element_rect(fill = NA, color = "black"),
+        strip.background = element_rect(fill = NA))
+
+# Finally, we add in on-the-fly factor transformations for names
+marginaleffects::predictions(log.rep.4, 
+                             newdata = datagrid(student = c(0,1), 
+                                                lmomentum = c(0:5),
+                                                rep_lag = c(0,1))) %>%
+  mutate(student = factor(student, levels = c("0", "1"), labels = c("No students", "Students")),
+         rep_lag = factor(rep_lag, levels = c("0", "1"), labels = c("Last event not repressed",
+                                                                    "Last event repressed"))) %>%
+  ggplot(aes(x = lmomentum,
+             y = predicted,
+             fill = factor(student))) +
+  geom_bar(stat = "identity",
+           position = position_dodge(),
+           color = "black") +
+  facet_wrap(~rep_lag) +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                position = position_dodge(0.9)) +
+  labs(title = "Predicted probabilities of government repression",
+       x = "Log of previous momentum in past 30 days",
+       y = "Predicted likelihood of government repression",
+       fill = "Students present?") +
+  theme(panel.border = element_rect(fill = NA, color = "black"),
+        strip.background = element_rect(fill = NA),
+        legend.position = "bottom",
+        strip.text = element_text(size = 10, face = "bold"))
+```
+
+
