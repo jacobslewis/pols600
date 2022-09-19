@@ -59,6 +59,7 @@ You are going to need to install several pieces of software in order to succeed 
 4. Visualizing data (`ggplot2` vs. R Base)
 
 ## Week 3 - Maximum Likelihood Estimation (MLE) & Binary Response Models
+**Reading** - [Against LPM 1](http://davegiles.blogspot.co.uk/2012/06/another-gripe-about-linear-probability.html), [Against LPM 2](http://davegiles.blogspot.co.uk/2012/06/yet-another-reason-for-avoiding-linear.html), [For LPMs](http://www.mostlyharmlesseconometrics.com/2012/07/probit-better-than-lpm/)
 1. Why use Max. Likelihood Models?
 2. Differences from OLS
 3. Connection to “real world” – data generation, collection, etc.
