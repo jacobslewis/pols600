@@ -1,0 +1,163 @@
+---
+title: "Lesson 4 - Ordinal Response Models"
+author: "Jacob S. Lewis"
+date: "2022-10-06"
+output: word_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Libraries
+```{r LIbraries}
+library(haven) # Brings in data from other formats (e.g., SPSS)
+library(tidyverse) # Brings in all the tidyverse packages!
+library(ordinal) # Allows for pooled and multilevel ordinal response models
+library(marginaleffects) # Easy plotting and generation of predicted probabilities
+```
+
+# Ordinal data
+1. What are they?
+2. How and why are they diff. from continuous data?
+3. What does it mean to make predictions with them?
+4. Predictions - bootstrapping?
+
+
+# Data
+What type of data use ordinal?
+1. Survey responses, often (discuss "feeling thermometers")
+2. Categorized data to rank things
+
+
+
+Let's bring in the Afrobarometer data and examine evaluations of identity
+1. Identity variable - Q85B
+2. Urban / Rural - URBRUR
+
+
+```{r Data - Afrobarometer}
+# Import the Afrobarometer data from SPSS format using the `haven` package
+a7 <- read_sav("Data sets/r7_merged_data_34ctry.release.sav") %>% # Bring in the data
+  select(RESPNO, COUNTRY, URBRUR, Q85B) %>% # Include only a few variables
+  filter(Q85B == 1 | Q85B == 2 | Q85B == 3 | Q85B == 4 | Q85B == 5) %>% # Only include values of identity b/t 1:5
+  filter(!URBRUR == 460) %>% # Get rid of NA values for urban/rural
+  mutate(identity = factor(Q85B,
+                           levels = c(1, 2, 3, 4, 5),
+                           labels = c("Only ethnic",
+                                      "Mostly ethnic",
+                                      "Equally ethnic/national",
+                                      "Mostly national",
+                                      "Only national")),
+         location = factor(URBRUR,
+                           levels = c(1, 2, 3),
+                           labels = c("Urban", "Rural", "Semi-Urban"))) %>%
+  glimpse()
+
+
+```
+
+Let's evaluate the data (Visualization)
+```{r Visualize the data}
+
+# Urban/Rural and identity
+ggplot(data = a7,
+       aes(x = identity,
+           fill = location)) +
+  geom_bar(position = "fill",
+           color = "black") +
+  labs(title = "Breakdown of identity and respondent location",
+       x = "",
+       y = "Count of individuals per localtion",
+       fill = "Location") +
+  theme(panel.border = element_rect(fill = NA, color = "black"))
+
+
+```
+
+What happens when we run an LPM rather than a CLM?
+```{r LPM}
+reg3 <- lm(as.numeric(identity) ~ location, data = a7)
+summary(reg3)
+
+marginaleffects::predictions(reg3,
+                             newdata = datagrid(location = c("Rural", "Semi-Urban", "Urban"))) %>%
+  ggplot(aes(x = location,
+             y = predicted,
+             label = sprintf("%0.2f", round(predicted, digits = 2)))) +
+  geom_bar(stat = "identity",
+           color = "black",
+           fill = "gray") +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high)) +
+  geom_text(vjust = -1.5) +
+  coord_cartesian(ylim = c(1,5))
+```
+
+Alright, now let's do it properly with a CLM!
+```{r CLM}
+
+# First, we'll run a factor IV, which is equivalent to a fixed effect model
+reg1 <- ordinal::clm(identity ~ location, data = a7)
+summary(reg1)
+
+## Now we can plot this out
+## Approach 1 (I prefer this)
+marginaleffects::predictions(reg1,
+                             newdata = datagrid(location = c("Rural", "Semi-Urban", "Urban"))) %>%
+  ggplot(aes(x = group,
+             y = predicted,
+             fill = location,
+             label = sprintf("%0.2f", round(predicted, digits = 2)))) +
+  geom_bar(stat = "identity",
+           position = "dodge",
+           color = "black") +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                position = position_dodge(0.9)) +
+  geom_text(position = position_dodge(0.9),
+            vjust = -1.5)
+
+## Approach 2 - useful, but harder to read
+marginaleffects::predictions(reg1,
+                             newdata = datagrid(location = c("Rural", "Semi-Urban", "Urban"))) %>%
+  ggplot(aes(x = group,
+             y = predicted)) +
+  geom_bar(stat = "identity",
+           color = "black",
+           fill = "gray") +
+  facet_wrap(~location,
+             ncol = 5) +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                position = position_dodge(0.9)) +
+  theme(panel.border = element_rect(fill = NA, color = "black"),
+        strip.background = element_rect(fill = NA),
+        axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+        strip.text = element_text(size = 12, face = "bold"))
+
+
+# Now, we'll run it as if location is continuous
+reg2 <- ordinal::clm(identity ~ as.numeric(location), data = a7)
+summary(reg2)
+
+## Now we can plot this out
+## Approach 1 (I prefer this)
+marginaleffects::predictions(reg2,
+                             newdata = datagrid(location = c(1, 2, 3))) %>%
+  ggplot(aes(x = group,
+             y = predicted,
+             fill = as.factor(location),
+             label = sprintf("%0.2f", round(predicted, digits = 2)))) +
+  geom_bar(stat = "identity",
+           position = "dodge",
+           color = "black") +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high),
+                position = position_dodge(0.9)) +
+  geom_text(position = position_dodge(0.9),
+            vjust = -2)
+
+
+
+```
+
+
