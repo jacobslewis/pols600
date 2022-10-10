@@ -76,6 +76,7 @@ You are going to need to install several pieces of software in order to succeed 
 4. Using the `Ordinal` package
 
 ## Week 5 - Count models
+**Reading** - [General information on count models](https://bookdown.org/roback/bookdown-BeyondMLR/ch-poissonreg.html)
 1. What is a count model? Why not just use OLS?
 2. Poisson distributions
 3. How the heck do we make predictions?
