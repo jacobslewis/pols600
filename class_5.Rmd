@@ -1,0 +1,322 @@
+---
+title: "Class 5 - Count Models"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r Libraries}
+# Bring in our normal libraries
+library(tidyverse)
+library(marginaleffects)
+library(modelsummary)
+
+# Bring in some statistical libraries
+library(pscl) # The "Political Science Computational Library" library
+library(MASS) # Modern Applied Statistics with S
+
+# Bring in the HERE library
+
+library(here)
+here()
+```
+
+# Count models versus Linear Regression
+What types of questions might we ask that would work for count models:
+1. How many protests occur in response to a new policy change?
+2. How many deaths occurred in different wars?
+
+Why should we use a count model rather than a linear regression?
+
+Poisson distribution
+
+In a `Poisson distribution`, we anchor the left-hand of the distribution to 0 and adjust the `lambda`, which is the average count of things at a given time/place.
+```{r Draw multiple Poisson distributions}
+
+# Set up the data frame
+p_dat <- map_df(1:10, ~ tibble(
+  l = paste(.),
+  x = 0:20,
+  y = dpois(0:20, .)
+))
+
+
+# Build Normal distributions
+n_dat <- map_df(1:10, ~ tibble(
+  l = paste(.),
+  x = seq(0, 20, by = 0.001),
+  y = dnorm(seq(0, 20, by = 0.001), ., sqrt(.))
+))
+
+
+# Use ggplot2 to plot
+ggplot(n_dat, aes(x, y, color = factor(l, levels = 1:10))) +
+  geom_line() +
+  geom_point(data = p_dat, aes(x, y, color = factor(l, levels = 1:10))) +
+  labs(color = "Lambda:") +
+  theme_minimal()
+```
+
+
+## Poisson models
+
+**Assumptions**
+1. The response variable is a count per unit of time/space in a Poisson distribution
+2. Observations must be independent of one another (this can be a problem in social science!)
+3. The mean of the variable must equal its variance (this can also be a problem!!!)
+4. The log of the mean rate must be a linear function of the IV
+
+
+# Using the UCDP/PRIO Global Events Data
+Let's take a look at a few different potential count models we could run!
+
+**First**, perhaps we want to know about deaths.
+
+Import the data
+```{r Bring in GED data for attacks and deaths}
+# Import the data
+ged <- read_csv(here::here("Data sets", "ged221-csv", "GEDEvent_v22_1.csv")) %>%
+  as_tibble() %>%
+  mutate(date_start = lubridate::ymd(date_start),
+         date_end = lubridate::ymd(date_end),
+         type_of_violence = factor(type_of_violence,
+                                   levels = 1:3,
+                                   labels = c("State-based violence",
+                                              "Non-state conflict",
+                                              "One-sided violence")),
+         duration = as.numeric(date_end - date_start)+1) %>%
+  glimpse()
+```
+
+First, run this using OLS (LPM)
+```{r LPM}
+# Run the model
+lpm1 <- lm(deaths_civilians ~ duration, data = ged)
+
+
+# Generate predictions
+marginaleffects::predictions(lpm1,
+                             newdata = datagrid(duration = c(1:20))) %>%
+  ggplot(aes(x = duration,
+             y = predicted)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high))
+
+
+```
+
+Okay, now run this using a Poisson model
+```{r Poisson}
+# Run a Poisson count model
+p1 <- glm(deaths_civilians ~ duration, 
+          family = poisson,
+          data = ged)
+
+
+# First, we can bootstrap the predictions
+## Bootstrap "as-is"
+ged$pred <- exp((coef(p1)[[1]] * 1) +
+                  (coef(p1)[[2]] * ged$duration))
+
+## From this, we can extract a mean (m) and a standard error (se)
+mean(ged$pred, na.rm = TRUE)
+sd(ged$pred, na.rm = TRUE)/sqrt(nrow(ged))
+
+## Bootstrap for values 1 through 20
+preds <- map_df(1:20,
+                ~ tibble(
+                  duration = (.),
+                  dur_m = mean(exp((coef(p1)[[1]] * 1) + (coef(p1)[[2]] * duration)), na.rm = TRUE)))
+
+# Now, we can use the marginaleffects package
+marginaleffects::predictions(p1,
+                             newdata = datagrid(duration = c(1:20))) %>%
+  ggplot(aes(x = duration,
+             y = predicted)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high))
+
+```
+
+Check these out against one another
+```{r Place predictions against one another}
+data.frame(mode = c(rep("LPM", 20), rep("GLM", 20)),
+                    duration = rep(1:20, 2),
+           predicted = c(marginaleffects::predictions(lpm1,
+                             newdata = datagrid(duration = c(1:20)))[,3],
+                         marginaleffects::predictions(p1,
+                             newdata = datagrid(duration = c(1:20)))[,3]),
+           conf.low = c(marginaleffects::predictions(lpm1,
+                             newdata = datagrid(duration = c(1:20)))[,7],
+                         marginaleffects::predictions(p1,
+                             newdata = datagrid(duration = c(1:20)))[,7]),
+           conf.high = c(marginaleffects::predictions(lpm1,
+                             newdata = datagrid(duration = c(1:20)))[,8],
+                         marginaleffects::predictions(p1,
+                             newdata = datagrid(duration = c(1:20)))[,8])) %>%
+  ggplot(aes(x = duration,
+             y = predicted,
+             color = mode)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low,
+                    ymax = conf.high))
+```
+
+
+**Second**, what about number of attacks in a given country?
+
+First, we'll need to modify the GED data
+```{r Create a tally of attacks in a given country per year}
+# Let's tally all of this down to the year
+ged2 <- ged %>%
+  arrange(country, date_start) %>%
+  filter(type_of_violence  %in% "Non-state conflict") %>%
+  group_by(country, year) %>%
+  tally()
+
+## Take a look at this:
+ged2
+
+## We can also create a linkage between GED country names and country_id
+ged3 <- ged %>%
+  dplyr::select(country, country_id) %>%
+  group_by(country) %>%
+  summarise(country_id = mean(country_id))
+
+```
+
+Alright, so what is the problem with this?
+WE ONLY RECORD OBSERVATIONS WHERE COUNTRIES AND YEARS HAVE CONFLICT
+
+How do we deal with this?
+
+```{r Create blank index and fill it in}
+# First, extract each individual country from the GED data (this still has a problem, but okay)
+countries <- unique(ged$country)
+
+# Now we'll create a blank dataset with each country and years 1989 through 2021
+cdf <- map_df(countries, ~
+                tibble(
+                  country = (.),
+                  year = rep(1989:2021)
+                )) %>%
+  full_join(ged2, by = c("country", "year")) %>%
+  rename(osv = n) %>%
+  mutate(osv = ifelse(is.na(osv), 0, osv)) %>% # Using the BASE ifelse rather than dplyr if_else
+  full_join(ged3, by = "country") %>%
+  rename(COWcode = country_id)
+```
+
+Now, let's assume that one-sided violence might be a function of whether an election is occurring and the GDP.
+
+Bring in the V-Dem data
+```{r Import the V-Dem data}
+# Import the V-Dem data
+vdem <- read_csv(file = here::here("Data sets", "vdem", "vdem" ,"V-Dem-CY-Full+Others-v12.csv")) %>%
+  dplyr::select(COWcode, year, v2pepwrgen, e_gdp) %>%
+  glimpse()
+
+# Put these data into the cdf dataset
+cdf <- cdf %>%
+  full_join(vdem, by = c("COWcode", "year")) %>%
+  rename(gender = v2pepwrgen,
+         gdp = e_gdp) %>%
+  mutate(lgdp = log(gdp + 1)) %>%
+  glimpse()
+```
+
+Alright, let's try out regressing osv on gender and GDP
+```{r Regressions}
+# Running a core Poisson model
+p4 <- glm(osv ~ gender + lgdp,
+          family = poisson,
+          data = cdf)
+
+# Running a Zero-Inflated Poisson model using the PLSC library
+p5 <- pscl::zeroinfl(osv ~ gender + lgdp,
+                     dist = c("poisson"),
+                     data = cdf)
+
+# Moving to NEGATIVE BINOMIAL with the MASS library
+p6 <- glm.nb(osv ~ gender + lgdp,
+             data = cdf)
+
+
+# Let's compare these models
+modelsummary(models = list(p4, p5, p6),
+             stars = TRUE)
+```
+
+
+Which of these models best predicts the outcome?
+
+
+So let's build on THAT model
+
+```{r Predicted counts}
+
+# Let's plot out the marginal effects
+marginaleffects::predictions(model = p6,
+                             newdata = datagrid(gender = seq(-1, 1, by = 0.1))) %>%
+  ggplot(aes(x = gender)) +
+  geom_ribbon(aes(ymin = conf.low,
+                  ymax = conf.high),
+              fill = "snow") +
+  geom_line(aes(y = predicted),
+            size = 0.75) +
+  geom_line(aes(y = conf.low),
+            linetype = "dashed",
+            size = 0.5) +
+  geom_line(aes(y = conf.high),
+            linetype = "dashed",
+            size = 0.5) +
+  theme(panel.border = element_rect(fill = NA,
+                                    color = "black",
+                                    size = 1),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12)) +
+  labs(title = "Predicted count of one-sided violence",
+       x = "V-Dem measurement of gender power balance",
+       y = "Predicted count of one-sided violence")
+
+
+
+
+
+# What if we broke out predictions by overall GDP?
+marginaleffects::predictions(model = p6,
+                             newdata = datagrid(gender = seq(-1, 1, by = 0.1),
+                                                lgdp = c((mean(cdf$lgdp, na.rm = TRUE) - sd(cdf$lgdp, na.rm = TRUE)),
+                                                          mean(cdf$lgdp, na.rm = TRUE),
+                                                          (mean(cdf$lgdp, na.rm = TRUE) + sd(cdf$lgdp, na.rm = TRUE))))) %>%
+  ggplot(aes(x = gender,
+             fill = factor(lgdp))) +
+  geom_ribbon(aes(ymin = conf.low,
+                  ymax = conf.high)) +
+  geom_line(aes(y = predicted),
+            size = 0.75) +
+  geom_line(aes(y = conf.low),
+            linetype = "dashed",
+            size = 0.5) +
+  geom_line(aes(y = conf.high),
+            linetype = "dashed",
+            size = 0.5) +
+  theme(panel.border = element_rect(fill = NA,
+                                    color = "black",
+                                    size = 1),
+        axis.title = element_text(size = 12, face = "bold"),
+        axis.text = element_text(size = 12),
+        legend.position = "bottom") +
+  labs(title = "Predicted count of one-sided violence",
+       x = "V-Dem measurement of gender power balance",
+       y = "Predicted count of one-sided violence")
+
+
+```
+
+
+
+
+
