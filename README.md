@@ -83,7 +83,9 @@ You are going to need to install several pieces of software in order to succeed 
 
 ## Week 6 - Multilevel / Hierarchical models
 **Reading** - [When to cluster standard errors?](https://arxiv.org/pdf/1710.02926.pdf), [A basic primer on clustering](https://economictheoryblog.com/2016/09/25/clustered-standard-errors/)
+
 **Note** - Perhaps the best, but slightly technical, reading on multilevel structures is Chapter 11 of Gelman and Hill's "Data Analysis Using Regression and Multilevel/Hierarchical Models," published by Cambridge University Press. This book is absolutely worth buying and reading if you plan to use statistics in your research.
+
 1. `LME4` package
 2. What are the advantages of hierarchical modeling?
 3. Why not just cluster your standard errors?
