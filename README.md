@@ -91,15 +91,10 @@ You are going to need to install several pieces of software in order to succeed 
 3. Why not just cluster your standard errors?
 4. What do we structure our levels at? (Hint: theory, theory, theory! Data, data, data!)
 5. Why not just use fixed effects models?
+6. Random slopes / intercepts models
 
-## Week 7 - Random slopes and intercepts
-1. What are the advantages of random slopes and intercepts?
-2. What are the disadvantages?
-3. Which variables to include in the mixed effects portion of the model?
-
-## Week 8 - When Good Models Go Bad
+## Week 7 - When Good Models Go Bad
 1. Why isn't my ML model maximizing?
 2. Did I just produce statistical mush?
 3. Singular binding
 4. Looping through levels
-
