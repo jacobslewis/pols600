@@ -1,0 +1,137 @@
+---
+title: "Class 6 - Intro to ML Models"
+author: "Jacob S. Lewis"
+date: "2022-11-03"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r Libraries}
+
+# Data management
+library(tidyverse)
+library(readxl)
+library(here)
+here()
+
+# Statistical analysis
+library(lme4)
+library(modelsummary)
+library(marginaleffects)
+library(arm)
+
+```
+
+
+
+# Data
+
+```{r Import the data}
+acled <- read_csv(here::here("Data sets", "acled.csv")) %>%
+  dplyr::filter(!region %in% "Antarctica") %>%
+  mutate(islamic = if_else(grepl("islam", assoc_actor_1, ignore.case = TRUE), 1, 0),
+         militia = if_else(grepl("militia", actor1, ignore.case = TRUE), 1, 0)) %>%
+  mutate(region2 = if_else(region %in% "Caribbean" | 
+                             region %in% "Central America" | 
+                             region %in% "South America", "Latin America",
+                           if_else(grepl("Africa", region), "Africa",
+                                   if_else(region %in% "Europe", "Europe",
+                                           if_else(grepl("Asia", region), "Asia",
+                                                   if_else(region %in% "North America", "North America", "Middle East")))))) %>%
+  glimpse()
+```
+
+```{r Run a simple pooled model}
+# Run the core regression
+lm.1 <- lm(fatalities ~ militia, data = acled)
+summary(lm.1)
+```
+
+```{r Fixed effects model}
+# Countries
+fe.1 <- lm(fatalities ~ militia + factor(country), data = acled)
+summary(fe.1)
+
+# Countries
+fe.2 <- lm(fatalities ~ militia + factor(region2), data = acled)
+summary(fe.2)
+```
+
+```{r Run the pooled model through error clustering}
+# Check out what happens when we just cluster standard errors by country
+modelsummary(models = lm.1,
+             stars = TRUE,
+             cluster = "country")
+```
+
+```{r Running multilevel model with random intercepts}
+
+
+# Now run a multilevel regression with random intercepts at the country level
+lm.2 <- lmer(fatalities ~ militia + (1 | country), data = acled)
+summary(lm.2)
+```
+
+```{r Running multilevel model with random slopes and intercepts}
+
+# What about a multilevel regression with random slopes and intercepts at the country level
+lm.3 <- lmer(fatalities ~ militia + (1 + militia | country), data = acled)
+summary(lm.3)
+
+## Let's take a look at what's going on here
+coef(lm.3)
+arm::se.coef(lm.3)
+```
+
+```{r Put the random effects into a data frame}
+# Can we map these out by bringing them into a data frame?
+rfx <- tibble(
+  country = row.names(coef(lm.3)[[1]]),
+  alpha = coef(lm.3)[[1]][,1],
+  alpha_se = se.coef(lm.3)[[2]][,1],
+  militia = coef(lm.3)[[1]][,2],
+  militia_se = se.coef(lm.3)[[2]][,2]) %>%
+  mutate(sign = if_else(militia > 0 & militia-1.96*militia_se > 0 |
+                          militia < 0 & militia+1.96*militia_se < 0, 1, 0))
+
+rfx$region2 <- acled$region2[match(rfx$country, acled$country)]
+```
+
+```{r Plot out the coefficient plots}
+rfx %>%
+  ggplot(aes(x = reorder(country, militia),
+             y  = militia,
+             color = factor(sign))) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point() +
+  geom_linerange(aes(ymin = militia - 1.96*militia_se,
+                  ymax = militia + 1.96*militia_se)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0)) +
+  facet_wrap(~region2, scales = "free") +
+  scale_color_manual(breaks = c("0", "1"),
+                     values = c("darkgray", "black"))
+```
+
+```{r Plot out coefficient plots only in Africa}
+ggplot(data = subset(rfx, region2 %in% "Africa"),
+       aes(x = reorder(country, militia),
+             y  = militia,
+             color = factor(sign))) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_point() +
+  geom_linerange(aes(ymin = militia - 1.96*militia_se,
+                  ymax = militia + 1.96*militia_se)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0)) +
+  scale_color_manual(breaks = c("0", "1"),
+                     values = c("darkgray", "black"))
+```
+
+
+
+
+
+
+
+
+
